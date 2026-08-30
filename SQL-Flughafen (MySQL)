@@ -1,0 +1,177 @@
+-- Tabellen für den Flughafen, die Fluglinie, das Flugzeug, den Flug, sowie fuer die Flugetappe
+CREATE TABLE Airport (
+    AirportCode VARCHAR(10) PRIMARY KEY,
+    AirportName VARCHAR(50),
+    AirportLocation VARCHAR(50),
+    Country VARCHAR(50)
+);
+
+CREATE TABLE Airline (
+    AirlineCode INTEGER PRIMARY KEY,
+    AirlineName VARCHAR(50)
+);
+
+CREATE TABLE Airplane (
+    ID INTEGER PRIMARY KEY,
+    Manufacturer VARCHAR(50),
+    Airspeed FLOAT,
+    Motor VARCHAR(50),
+    Airline INTEGER REFERENCES Airline(AirlineCode)
+);
+
+CREATE TABLE Flight (
+    FlightNumber INTEGER PRIMARY KEY,
+    Airline INTEGER REFERENCES Airline(AirlineCode),
+    Airplane VARCHAR(50) REFERENCES Airplane(ID)
+);
+
+CREATE TABLE Leg (
+    LegID INTEGER PRIMARY KEY,
+    Flight VARCHAR(30) REFERENCES Flight(FlightNumber),
+    DepartureAirport VARCHAR(30) REFERENCES Airport(AirlineCode),
+    DestinationAirport VARCHAR(30) REFERENCES Airport(AirportCode),
+    DepartureTime TIME,
+    ArrivalTime TIME
+
+);
+
+INSERT INTO Airport
+VALUES ("BER", "Flughafen Berlin Brandenburg", "Berlin", "Deutschland"), 
+("MUC", "Flughafen München", "München", "Deutschand"), 
+("FRAU", "Flughafen Frankfurt", "Frankfurt", "Deutschland");
+
+INSERT INTO Airline
+VALUES (220, "Lufthansa"), (345, "Ryanair");
+
+INSERT INTO Airplane VALUES (1, "Boeing", 933, "Rolls-Royce RB 211", 220)
+, (2, "Boeing", 867, "General Electric CF", 345)
+, (3, Airbus, 988, "General Electric CF", 220);
+
+
+-- Fügt der Tabelle Airline eine neue Spalte namens "Location" hinzu, die den Heimatstandort angibt   
+ALTER TABLE Airline 
+ADD Location VARCHAR(30);
+
+-- Flughafen München (Airport Code MUC) soll in "Flughafen München Franz Josef Strauß" umbenannt werden
+UPDATE Airport
+SET AirportName = 'Flughafen München Franz Josef Strauß'
+WHERE AirportCode = 'MUC';
+
+-- Neue Tabelle Country, welche mittels einer Anfrage alle Länder aus der Tabelle Airport erhält.
+CREATE TABLE Country (
+    Country VARCHAR (30) PRIMARY KEY
+);
+
+INSERT INTO Country (Country)
+SELECT DISTINCT Country
+FROM Airport;
+
+ALTER TABLE Airport
+ADD CONSTRAINT FK_Airport_Country
+FOREIGN KEY (Country) REFERENCES Country(Country);
+
+-- Ausgabe aller italienischen Flughäfen (AirportCode und AirportName)
+SELECT AirportCode, AirportName
+FROM Airport
+WHERE Country='Italien';
+
+
+-- Ausgabe aller Flughäfen (mit allen Attributen), die in New York oder London angesiedelt sind.
+SELECT *
+FROM Airport
+WHERE AirportLocation='New York' OR AirportLocation='London';
+
+
+-- Ausgabe der Hersteller aller Flugzeuge, welche Flugzeuge mit einer Luftgeschwindigkeit über 900 km/h bauen
+SELECT Manufacturer
+FROM Airplane
+WHERE Airspeed > 900;
+
+
+-- Ausgabe der Flugnummer aller von der Airline mit dem AirlineCode 200 durchgeführten Flüge
+SELECT FlightNumber
+FROM Flight
+WHERE Airline = 220;
+
+
+-- Ausgabe aller Flugzeuge (ID, Airspeed und Motor), welche nicht von Airbus hergestellt worden sind
+SELECT ID, Airspeed, Motor
+FROM Airplane
+WHERE Manufacturer <> 'Airbus';
+
+
+-- Zusatzaufgaben
+
+
+-- View mit dem Namen "Flugzeugübersicht"
+-- Zeigt alle Flugzeuge an, die zur Airline Lufthansa gehören.
+
+CREATE VIEW Flugzeugübersicht AS
+SELECT Airplane.* 
+FROM Airline
+JOIN Airline
+ON Airplane.Airline = Airline.AirlineCode
+WHERE Airline.AirlineName = 'Lufthansa';
+
+-- Gibt die Namen der Airlines aus, welche ausschließlich Flugzeuge des Herstellers Boeing fliegen 
+
+SELECT Airline.Airlinename
+FROM Airline
+JOIN Airplane ON Airline.AirlineCode = Airplane.Airline
+WHERE Airplane.Manufacturer = 'Boeing'
+AND NOT EXISTS (
+	SELECT *
+	FROM Airplane AS A
+    WHERE A.Airline = Airline.AirlineCode
+    AND A.Manufacturer <> 'Boeing'
+); 
+
+
+-- Gibt die ID, Luftgeschwindigkeit und Motorart eines Flugzeugs
+-- sowie die Durchschnittsgeschwindigkeit des entsprechenden Motors aus.
+-- Es werden nur Flugzeuge angezeigt, deren Airspeed größer als
+-- die gespeicherte Durchschnittsgeschwindigkeit ist.
+SELECT Airplane.ID, Airplane.Airspeed, Airplane.Motor, Durchschnittsgeschwindigkeit_VIEW.Durchschnittsgeschwindigkeit
+FROM Airplane
+JOIN Durchschnittsgeschwindigkeit_VIEW ON Airplane.Motor = Durchschnittsgeschwindigkeit_VIEW.Durchschnittsgeschwindigkeit
+WHERE  Airplane.Airspeed > Durchschnittsgeschwindigkeit_View.Durchschnittsgeschwindigkeit;
+
+
+-- Zählt die Anzahl der Flughäfen an jedem Standort.
+-- Die Ergebnisse werden nach dem jeweiligen AirportLocation gruppiert.
+SELECT AirportLocation, AirportCode, count(*)
+FROM Airport
+GROUP BY AirportLocation;
+
+
+-- Erstellt eine View mit dem Namen "AnzFlug".
+-- Die View speichert für jeden Standort die Anzahl der dort vorhandenen Flughäfen.
+CREATE VIEW AnzFlug AS
+SELECT AirportLocation,
+COUNT(*) AS Anzahl
+FROM Airport
+GROUP BY AirportLocation;
+
+-- Gibt die Standorte aus, an denen mehr als ein Flughafen vorhanden ist.
+-- Die Ergebnisse werden absteigend nach der Anzahl der Flughäfen sortiert.
+SELECT *
+FROM AnzFlug
+JOIN Airport ON Airport.Location = AnzFlug.AirportLocation
+WHERE AnzahlFlughaefen > 1
+ORDER BY AnzahlFlughaefen DESC;
+
+-- Zusatzaufgabe (Top-N-Abfrage)
+
+-- Ausgabe der drei schnellsten Flugzeuge zusammen mit ihrer Flugzeugkennung, dem Hersteller, der Reisegeschwindigkeit, den Namen der zugehörigen Airline sowie der Platzierung in aufsteigender Reihenfolge.
+-- Flugzeuge mit identischer Reisegeschwindigkeit erhalten dieselbe Platzierung .
+SELECT ID, Manufacturer, Airspeed AS x, AirlineName, 
+(SELECT count(Airspeed) FROM Airplane a WHERE x.Airspeed > a.Airspeed) +1 AS Platzierung
+FROM Airplane
+WHERE Platzierung <= 3
+ORDER BY Platzierung DESC;
+
+SELECT *
+FROM Airplane, Speed_view
+WHERE Airplane.ID = Speed_view.ID
+AND Platzierung <= 3
+ORDER BY Platzierung <= 3;
